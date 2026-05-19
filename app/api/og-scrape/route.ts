@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const html = await res.text()
 
-    function getMeta(property: string): string | null {
+    const getMeta = (property: string): string | null => {
       const patterns = [
         new RegExp(`<meta[^>]+property=["']og:${property}["'][^>]+content=["']([^"']+)["']`, 'i'),
         new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${property}["']`, 'i'),
