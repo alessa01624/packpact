@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+
+.safe-pb {
+  padding-bottom: calc(5rem + var(--safe-bottom));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+
+/* Calendar overrides */
+.rdp-day_selected,
+.rdp-day_selected:hover {
+  background-color: #7c3aed !important;
+  color: #fff !important;
+}
+.rdp-day_today {
+  font-weight: 700;
+  color: #7c3aed;
+}
+.rdp {
+  --rdp-cell-size: 40px;
+  --rdp-accent-color: #7c3aed;
+  --rdp-background-color: #fff;
+  color: #111827;
+  margin: 0;
+}
+.rdp-head_cell {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.rdp-nav_button:hover {
+  background-color: #f3f4f6;
+}

@@ -1,0 +1,12 @@
+{
+  "name": "PackPact",
+  "short_name": "PackPact",
+  "description": "La vacanza di gruppo, senza litigi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
