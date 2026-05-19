@@ -74,7 +74,7 @@ const EURO_DESTINATIONS = [
   'New York','Los Angeles','San Francisco','Londra',
 ]
 
-const ALL_DESTINATIONS = [...new Set([...ITALIAN_DESTINATIONS, ...EURO_DESTINATIONS])]
+const ALL_DESTINATIONS = Array.from(new Set(ITALIAN_DESTINATIONS.concat(EURO_DESTINATIONS)))
 
 interface Props {
   tripId: string
