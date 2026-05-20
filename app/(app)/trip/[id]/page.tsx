@@ -89,16 +89,19 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     myVotedProposalIds = (myVotes ?? []).map(v => v.proposal_id)
   }
 
-  // Get which members have voted at least once (bypass RLS)
-  const admin = createAdminClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const { data: voterRows } = await admin
-    .from('votes')
-    .select('member_id')
-    .eq('trip_id', id)
-  const membersWhoVoted = Array.from(new Set((voterRows ?? []).map((r: { member_id: string }) => r.member_id)))
+  // Get which members have voted at least once (bypass RLS with service role)
+  let membersWhoVoted: string[] = []
+  try {
+    const admin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: voterRows } = await admin
+      .from('votes')
+      .select('member_id')
+      .eq('trip_id', id)
+    membersWhoVoted = Array.from(new Set((voterRows ?? []).map((r: { member_id: string }) => r.member_id)))
+  } catch {}
 
   return (
     <TripHomeClient
