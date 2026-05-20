@@ -98,7 +98,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     .from('votes')
     .select('member_id')
     .eq('trip_id', id)
-  const membersWhoVoted = [...new Set((voterRows ?? []).map(r => r.member_id as string))]
+  const membersWhoVoted = Array.from(new Set((voterRows ?? []).map((r: { member_id: string }) => r.member_id)))
 
   return (
     <TripHomeClient

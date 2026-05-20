@@ -52,7 +52,7 @@ export default async function ProposalsPage({ params }: { params: Promise<{ id: 
     .from('votes')
     .select('member_id')
     .eq('trip_id', id)
-  const membersWhoVoted = [...new Set((voterRows ?? []).map(r => r.member_id))]
+  const membersWhoVoted = Array.from(new Set((voterRows ?? []).map((r: { member_id: string }) => r.member_id)))
 
   // If revealed, get votes
   let myVotedProposalIds: string[] = []
