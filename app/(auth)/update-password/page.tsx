@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -9,9 +9,40 @@ export default function UpdatePasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const supabase = createClient()
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code')
+
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
+        if (err) {
+          window.location.href = '/login'
+        } else {
+          setReady(true)
+        }
+      })
+    } else {
+      // Implicit flow: Supabase client auto-detects hash fragment
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setReady(true)
+        } else {
+          // Wait briefly for Supabase to process hash tokens
+          setTimeout(() => {
+            supabase.auth.getSession().then(({ data: { session: s } }) => {
+              if (s) setReady(true)
+              else window.location.href = '/login'
+            })
+          }, 500)
+        }
+      })
+    }
+  }, [])
 
   async function handleSubmit() {
     if (!password || !confirm) {
@@ -36,6 +67,14 @@ export default function UpdatePasswordPage() {
     }
     setSuccess('Password updated! Redirecting...')
     setTimeout(() => { window.location.href = '/' }, 1500)
+  }
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (

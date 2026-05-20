@@ -29,8 +29,9 @@ export async function updateSession(request: NextRequest) {
   const isAuthCallback = request.nextUrl.pathname.startsWith('/auth')
   const isJoinPage = request.nextUrl.pathname.startsWith('/join')
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isUpdatePassword = request.nextUrl.pathname.startsWith('/update-password')
 
-  if (!user && !isAuthPage && !isAuthCallback && !isJoinPage && !isApiRoute) {
+  if (!user && !isAuthPage && !isAuthCallback && !isJoinPage && !isApiRoute && !isUpdatePassword) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
