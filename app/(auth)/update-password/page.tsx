@@ -60,8 +60,9 @@ export default function UpdatePasswordPage() {
     setError('')
     const { error: err } = await supabase.auth.updateUser({ password })
     if (err) { setError(err.message); setLoading(false); return }
-    setSuccess('Password updated! Redirecting...')
-    setTimeout(() => { window.location.href = '/' }, 1500)
+    await supabase.auth.signOut()
+    setSuccess('Password updated! Please sign in with your new password.')
+    setTimeout(() => { window.location.href = '/login' }, 2000)
   }
 
   if (!ready) {
