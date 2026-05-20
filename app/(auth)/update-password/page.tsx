@@ -15,24 +15,37 @@ export default function UpdatePasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Official Supabase method: fires PASSWORD_RECOVERY event for both PKCE and implicit flows
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setReady(true)
-      }
-    })
-
-    // Also handle PKCE code in URL (fires before onAuthStateChange in some versions)
+    // Check for error in URL (expired/invalid link)
     const params = new URLSearchParams(window.location.search)
+    const urlError = params.get('error') || new URLSearchParams(window.location.hash.slice(1)).get('error')
+    if (urlError) {
+      setError('This reset link has expired. Please request a new one.')
+      setReady(true)
+      return
+    }
+
+    // PKCE: code in query params
     const code = params.get('code')
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
         if (!err) setReady(true)
-        else window.location.href = '/login'
+        else { setError('Invalid or expired link. Please request a new one.'); setReady(true) }
       })
+      return
     }
 
-    return () => subscription.unsubscribe()
+    // Implicit flow: PASSWORD_RECOVERY event from hash token
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    })
+
+    // Timeout fallback
+    const t = setTimeout(() => {
+      setError('Could not verify the reset link. Please request a new one.')
+      setReady(true)
+    }, 5000)
+
+    return () => { subscription.unsubscribe(); clearTimeout(t) }
   }, [])
 
   async function handleSubmit() {
@@ -52,6 +65,29 @@ export default function UpdatePasswordPage() {
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
         <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
         <p className="text-zinc-500 text-sm">Verifying reset link...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-sm space-y-6 text-center"
+        >
+          <div className="text-5xl">⏰</div>
+          <h1 className="text-2xl font-extrabold text-white">Link expired</h1>
+          <p className="text-red-400 text-sm">{error}</p>
+          <button
+            onClick={() => window.location.href = '/login'}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-2xl text-sm transition-all"
+          >
+            ← Request a new link
+          </button>
+        </motion.div>
       </div>
     )
   }
