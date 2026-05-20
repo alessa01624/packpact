@@ -10,7 +10,7 @@ export default function LoginPage() {
 }
 
 function LoginInner() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'reset'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -21,8 +21,14 @@ function LoginInner() {
   const next = searchParams.get('next') ?? '/'
   const supabase = createClient()
 
+  function switchMode(m: 'login' | 'register' | 'reset') {
+    setMode(m)
+    setError('')
+    setSuccess('')
+  }
+
   async function handleEmailAuth() {
-    if (!email.trim() || !password) {
+    if (!email.trim() || (mode !== 'reset' && !password)) {
       setError('Please enter your email and password')
       return
     }
@@ -38,19 +44,36 @@ function LoginInner() {
         return
       }
       window.location.href = next
-    } else {
+
+    } else if (mode === 'register') {
       const { error: err } = await supabase.auth.signUp({ email: email.trim(), password })
       if (err) {
-        if (err.message.includes('already registered')) {
-          setError('Email already registered. Please sign in.')
-        } else {
-          setError(err.message)
-        }
+        setError(err.message.includes('already registered')
+          ? 'Email already registered. Please sign in.'
+          : err.message)
         setLoading(null)
         return
       }
       setSuccess('Account created! You can now sign in.')
       setMode('login')
+      setLoading(null)
+
+    } else {
+      // reset
+      if (!email.trim()) {
+        setError('Please enter your email address')
+        setLoading(null)
+        return
+      }
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/auth/callback`,
+      })
+      if (err) {
+        setError(err.message)
+        setLoading(null)
+        return
+      }
+      setSuccess('Password reset email sent! Check your inbox.')
       setLoading(null)
     }
   }
@@ -87,95 +110,145 @@ function LoginInner() {
           </p>
         </div>
 
-        {/* Mode toggle */}
-        <div className="flex bg-zinc-900 rounded-2xl p-1">
-          <button
-            onClick={() => { setMode('login'); setError(''); setSuccess('') }}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              mode === 'login' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => { setMode('register'); setError(''); setSuccess('') }}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              mode === 'register' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
-            }`}
-          >
-            Register
-          </button>
-        </div>
+        {mode !== 'reset' ? (
+          <>
+            {/* Mode toggle */}
+            <div className="flex bg-zinc-900 rounded-2xl p-1">
+              <button
+                onClick={() => switchMode('login')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  mode === 'login' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
+                }`}
+              >
+                Sign in
+              </button>
+              <button
+                onClick={() => switchMode('register')}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  mode === 'register' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
+                }`}
+              >
+                Register
+              </button>
+            </div>
 
-        {/* Email form */}
-        <div className="space-y-3">
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="Email"
-            autoComplete="email"
-            className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-4 py-4 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-          />
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleEmailAuth()}
-              placeholder="Password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-4 py-4 pr-12 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(v => !v)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            {/* Fields */}
+            <div className="space-y-3">
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="Email"
+                autoComplete="email"
+                className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-4 py-4 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleEmailAuth()}
+                  placeholder="Password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-4 py-4 pr-12 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(v => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              {mode === 'login' && (
+                <div className="text-right">
+                  <button
+                    onClick={() => switchMode('reset')}
+                    className="text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              )}
+
+              {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+              {success && <p className="text-emerald-400 text-sm text-center">{success}</p>}
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleEmailAuth}
+                disabled={loading !== null}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-sm transition-all"
+              >
+                {loading === 'email' ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                ) : mode === 'login' ? 'Sign in →' : 'Create account →'}
+              </motion.button>
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-zinc-800" />
+              <span className="text-zinc-600 text-xs">or</span>
+              <div className="flex-1 h-px bg-zinc-800" />
+            </div>
+
+            {/* Google */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={signInGoogle}
+              disabled={loading !== null}
+              className="w-full flex items-center justify-center gap-3 bg-white text-zinc-900 font-semibold py-4 rounded-2xl text-sm shadow-lg disabled:opacity-60 transition-opacity"
             >
-              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              {loading === 'google' ? (
+                <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-800 rounded-full animate-spin" />
+              ) : (
+                <GoogleIcon />
+              )}
+              Continue with Google
+            </motion.button>
+          </>
+        ) : (
+          /* Reset password screen */
+          <div className="space-y-4">
+            <div className="text-center space-y-1">
+              <h2 className="text-white font-bold text-lg">Reset your password</h2>
+              <p className="text-zinc-400 text-sm">Enter your email and we&apos;ll send you a reset link.</p>
+            </div>
+
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleEmailAuth()}
+              placeholder="Email"
+              autoComplete="email"
+              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-2xl px-4 py-4 text-sm placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+            />
+
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {success && <p className="text-emerald-400 text-sm text-center">{success}</p>}
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleEmailAuth}
+              disabled={loading !== null}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-sm transition-all"
+            >
+              {loading === 'email' ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+              ) : 'Send reset link →'}
+            </motion.button>
+
+            <button
+              onClick={() => switchMode('login')}
+              className="w-full text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+            >
+              ← Back to sign in
             </button>
           </div>
-
-          {error && (
-            <p className="text-red-400 text-sm text-center">{error}</p>
-          )}
-          {success && (
-            <p className="text-emerald-400 text-sm text-center">{success}</p>
-          )}
-
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleEmailAuth}
-            disabled={loading !== null}
-            className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-sm transition-all"
-          >
-            {loading === 'email' ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
-            ) : mode === 'login' ? 'Sign in →' : 'Create account →'}
-          </motion.button>
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-zinc-800" />
-          <span className="text-zinc-600 text-xs">or</span>
-          <div className="flex-1 h-px bg-zinc-800" />
-        </div>
-
-        {/* Google */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={signInGoogle}
-          disabled={loading !== null}
-          className="w-full flex items-center justify-center gap-3 bg-white text-zinc-900 font-semibold py-4 rounded-2xl text-sm shadow-lg disabled:opacity-60 transition-opacity"
-        >
-          {loading === 'google' ? (
-            <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-800 rounded-full animate-spin" />
-          ) : (
-            <GoogleIcon />
-          )}
-          Continue with Google
-        </motion.button>
+        )}
 
         <p className="text-center text-zinc-600 text-xs">
           By signing in you agree to our terms of service.<br />
