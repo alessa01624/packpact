@@ -16,6 +16,10 @@ function LoginInner() {
 
   async function signIn(provider: 'google' | 'apple') {
     setLoading(provider)
+    // Store intended destination in a cookie so callback can read it even if query params are stripped
+    if (next !== '/') {
+      document.cookie = `auth_next=${encodeURIComponent(next)}; path=/; max-age=300; samesite=lax`
+    }
     const base = process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin
     await supabase.auth.signInWithOAuth({
       provider,
