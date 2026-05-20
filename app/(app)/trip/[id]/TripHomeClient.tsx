@@ -26,12 +26,13 @@ interface Props {
   myVotedProposalIds: string[]
   voteCounts: Record<string, number>
   secretWishes: { memberId: string; wish: string }[]
+  membersWhoVoted: string[]
 }
 
 export default function TripHomeClient({
   trip, currentMember, members, completedMemberIds, groupProfile,
   hasCompletedQuestionnaire, proposals: initialProposals,
-  myVotedProposalIds, voteCounts: initialVoteCounts, secretWishes,
+  myVotedProposalIds, voteCounts: initialVoteCounts, secretWishes, membersWhoVoted,
 }: Props) {
   const supabase = createClient()
   const [tab, setTab] = useState<Tab>('overview')
@@ -510,6 +511,31 @@ export default function TripHomeClient({
                 <p className="text-4xl">🏖️</p>
                 <p className="font-semibold text-gray-700">No proposals yet</p>
                 <p className="text-gray-400 text-xs">Be the first to add an accommodation link!</p>
+              </div>
+            )}
+
+            {/* Voting status */}
+            {!isRevealed && members.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Who has voted</p>
+                </div>
+                {members.map(m => {
+                  const hasVoted = membersWhoVoted.includes(m.id)
+                  const isMe = m.id === currentMember.id
+                  return (
+                    <div key={m.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
+                      <span className="text-gray-800 text-sm">{m.emoji} {m.display_name}{isMe ? ' (you)' : ''}</span>
+                      {hasVoted ? (
+                        <span className="text-emerald-600 text-xs font-semibold flex items-center gap-1">
+                          ✓ Voted
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Never voted</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </>

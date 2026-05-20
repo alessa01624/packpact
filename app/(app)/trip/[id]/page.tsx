@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import TripHomeClient from './TripHomeClient'
 import { computeGroupProfile } from '@/lib/trip'
 
@@ -88,6 +89,17 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
     myVotedProposalIds = (myVotes ?? []).map(v => v.proposal_id)
   }
 
+  // Get which members have voted at least once (bypass RLS)
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: voterRows } = await admin
+    .from('votes')
+    .select('member_id')
+    .eq('trip_id', id)
+  const membersWhoVoted = [...new Set((voterRows ?? []).map(r => r.member_id as string))]
+
   return (
     <TripHomeClient
       trip={trip}
@@ -101,6 +113,7 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       myVotedProposalIds={myVotedProposalIds}
       voteCounts={voteCounts}
       secretWishes={secretWishes}
+      membersWhoVoted={membersWhoVoted}
     />
   )
 }
