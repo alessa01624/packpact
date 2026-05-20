@@ -67,6 +67,7 @@ export default function TripHomeClient({
   const [proposals, setProposals] = useState<Proposal[]>(initialProposals)
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set(myVotedProposalIds))
   const [voteCounts, setVoteCounts] = useState(initialVoteCounts)
+  const [whoVoted, setWhoVoted] = useState<Set<string>>(new Set(membersWhoVoted))
 
   const isRevealed = trip.phase === 'revealed'
   const inviteUrl = `${typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL ?? '')}/join/${trip.invite_token}`
@@ -92,6 +93,16 @@ export default function TripHomeClient({
       alreadyVoted ? next.delete(proposalId) : next.add(proposalId)
       return next
     })
+    // Update whoVoted: add on first vote, remove only if no more votes
+    if (!alreadyVoted) {
+      setWhoVoted(prev => new Set(prev).add(currentMember.id))
+    } else {
+      // Check if user still has other votes after removing this one
+      const remainingVotes = [...votedIds].filter(id => id !== proposalId)
+      if (remainingVotes.length === 0) {
+        setWhoVoted(prev => { const s = new Set(prev); s.delete(currentMember.id); return s })
+      }
+    }
     if (navigator.vibrate) navigator.vibrate(10)
     if (alreadyVoted) {
       await supabase.from('votes').delete().eq('proposal_id', proposalId).eq('member_id', currentMember.id)
@@ -515,21 +526,24 @@ export default function TripHomeClient({
             )}
 
             {/* Voting status */}
-            {!isRevealed && members.length > 0 && (
+            {!isRevealed && (trip.member_slots ?? members.map(m => m.display_name)).length > 0 && (
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-100">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Who has voted</p>
                 </div>
-                {members.map(m => {
-                  const hasVoted = membersWhoVoted.includes(m.id)
-                  const isMe = m.id === currentMember.id
+                {(trip.member_slots ?? members.map(m => m.display_name)).map(slotName => {
+                  const joined = members.find(m => m.display_name === slotName)
+                  const isMe = joined?.id === currentMember.id
+                  const hasVoted = joined ? whoVoted.has(joined.id) : false
                   return (
-                    <div key={m.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
-                      <span className="text-gray-800 text-sm">{m.emoji} {m.display_name}{isMe ? ' (you)' : ''}</span>
-                      {hasVoted ? (
-                        <span className="text-emerald-600 text-xs font-semibold flex items-center gap-1">
-                          ✓ Voted
-                        </span>
+                    <div key={slotName} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
+                      <span className="text-gray-800 text-sm">
+                        {joined ? `${joined.emoji} ` : '👤 '}{slotName}{isMe ? ' (you)' : ''}
+                      </span>
+                      {!joined ? (
+                        <span className="text-gray-300 text-xs">Not joined</span>
+                      ) : hasVoted ? (
+                        <span className="text-emerald-600 text-xs font-semibold">✓ Voted</span>
                       ) : (
                         <span className="text-gray-400 text-xs">Never voted</span>
                       )}
