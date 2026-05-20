@@ -23,7 +23,7 @@ function LoginInner() {
 
   async function handleEmailAuth() {
     if (!email.trim() || !password) {
-      setError('Inserisci email e password')
+      setError('Please enter your email and password')
       return
     }
     setLoading('email')
@@ -33,7 +33,7 @@ function LoginInner() {
     if (mode === 'login') {
       const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (err) {
-        setError('Email o password errati. Riprova.')
+        setError('Wrong email or password. Please try again.')
         setLoading(null)
         return
       }
@@ -42,15 +42,15 @@ function LoginInner() {
       const { error: err } = await supabase.auth.signUp({ email: email.trim(), password })
       if (err) {
         if (err.message.includes('already registered')) {
-          setError('Email già registrata. Prova ad accedere.')
+          setError('Email already registered. Please sign in.')
         } else {
           setError(err.message)
         }
         setLoading(null)
         return
       }
-      // Auto-confirm disabled → user needs to confirm email
-      setSuccess('Controlla la tua email e clicca il link di conferma per completare la registrazione.')
+      setSuccess('Account created! You can now sign in.')
+      setMode('login')
       setLoading(null)
     }
   }
@@ -82,8 +82,8 @@ function LoginInner() {
           <div className="text-5xl">🧳</div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">PackPact</h1>
           <p className="text-zinc-400 text-sm leading-relaxed">
-            La vacanza di gruppo, senza litigi.<br />
-            Vota, decidi, parti.
+            Group trips, without the drama.<br />
+            Vote, decide, go.
           </p>
         </div>
 
@@ -95,7 +95,7 @@ function LoginInner() {
               mode === 'login' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
             }`}
           >
-            Accedi
+            Sign in
           </button>
           <button
             onClick={() => { setMode('register'); setError(''); setSuccess('') }}
@@ -103,7 +103,7 @@ function LoginInner() {
               mode === 'register' ? 'bg-zinc-700 text-white' : 'text-zinc-500'
             }`}
           >
-            Registrati
+            Register
           </button>
         </div>
 
@@ -151,14 +151,14 @@ function LoginInner() {
           >
             {loading === 'email' ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
-            ) : mode === 'login' ? 'Accedi →' : 'Crea account →'}
+            ) : mode === 'login' ? 'Sign in →' : 'Create account →'}
           </motion.button>
         </div>
 
         {/* Divider */}
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-zinc-800" />
-          <span className="text-zinc-600 text-xs">oppure</span>
+          <span className="text-zinc-600 text-xs">or</span>
           <div className="flex-1 h-px bg-zinc-800" />
         </div>
 
@@ -174,12 +174,12 @@ function LoginInner() {
           ) : (
             <GoogleIcon />
           )}
-          Continua con Google
+          Continue with Google
         </motion.button>
 
         <p className="text-center text-zinc-600 text-xs">
-          Accedendo accetti i nostri termini di servizio.<br />
-          Nessuna spam, promesso. 🤝
+          By signing in you agree to our terms of service.<br />
+          No spam, promised. 🤝
         </p>
       </motion.div>
     </div>
