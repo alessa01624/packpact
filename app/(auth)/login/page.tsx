@@ -65,10 +65,8 @@ function LoginInner() {
         setLoading(null)
         return
       }
-      // Signal to /auth/callback that this is a reset flow
-      document.cookie = 'pending_reset=1; path=/; max-age=3600; samesite=lax'
       const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/auth/callback`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/update-password`,
       })
       if (err) {
         setError(err.message)

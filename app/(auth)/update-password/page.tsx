@@ -15,64 +15,43 @@ export default function UpdatePasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    const url = new URL(window.location.href)
-    const code = url.searchParams.get('code')
+    // Official Supabase method: fires PASSWORD_RECOVERY event for both PKCE and implicit flows
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setReady(true)
+      }
+    })
 
+    // Also handle PKCE code in URL (fires before onAuthStateChange in some versions)
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
-        if (err) {
-          window.location.href = '/login'
-        } else {
-          setReady(true)
-        }
-      })
-    } else {
-      // Implicit flow: Supabase client auto-detects hash fragment
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setReady(true)
-        } else {
-          // Wait briefly for Supabase to process hash tokens
-          setTimeout(() => {
-            supabase.auth.getSession().then(({ data: { session: s } }) => {
-              if (s) setReady(true)
-              else window.location.href = '/login'
-            })
-          }, 500)
-        }
+        if (!err) setReady(true)
+        else window.location.href = '/login'
       })
     }
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleSubmit() {
-    if (!password || !confirm) {
-      setError('Please fill in both fields')
-      return
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match')
-      return
-    }
+    if (!password || !confirm) { setError('Please fill in both fields'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return }
+    if (password !== confirm) { setError('Passwords do not match'); return }
     setLoading(true)
     setError('')
     const { error: err } = await supabase.auth.updateUser({ password })
-    if (err) {
-      setError(err.message)
-      setLoading(false)
-      return
-    }
+    if (err) { setError(err.message); setLoading(false); return }
     setSuccess('Password updated! Redirecting...')
     setTimeout(() => { window.location.href = '/' }, 1500)
   }
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
         <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+        <p className="text-zinc-500 text-sm">Verifying reset link...</p>
       </div>
     )
   }
@@ -129,9 +108,9 @@ export default function UpdatePasswordPage() {
             disabled={loading}
             className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-sm transition-all"
           >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
-            ) : 'Set new password →'}
+            {loading
+              ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+              : 'Set new password →'}
           </motion.button>
         </div>
       </motion.div>
