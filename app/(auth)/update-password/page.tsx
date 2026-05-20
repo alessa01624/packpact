@@ -15,37 +15,41 @@ export default function UpdatePasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Check for error in URL (expired/invalid link)
     const params = new URLSearchParams(window.location.search)
-    const urlError = params.get('error') || new URLSearchParams(window.location.hash.slice(1)).get('error')
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+
+    // Supabase error in URL (expired link)
+    const urlError = params.get('error') || hashParams.get('error')
     if (urlError) {
       setError('This reset link has expired. Please request a new one.')
       setReady(true)
       return
     }
 
-    // PKCE: code in query params
+    // PKCE: code in URL — exchange it client-side
     const code = params.get('code')
     if (code) {
       supabase.auth.exchangeCodeForSession(code).then(({ error: err }) => {
-        if (!err) setReady(true)
-        else { setError('Invalid or expired link. Please request a new one.'); setReady(true) }
+        if (!err) {
+          setReady(true)
+        } else {
+          setError('Invalid or expired link. Please request a new one.')
+          setReady(true)
+        }
       })
       return
     }
 
-    // Implicit flow: PASSWORD_RECOVERY event from hash token
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+    // No code in URL: the server-side callback already exchanged it.
+    // Just check we have a valid session.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setReady(true)
+      } else {
+        // No session at all — not a valid reset flow
+        window.location.href = '/login'
+      }
     })
-
-    // Timeout fallback
-    const t = setTimeout(() => {
-      setError('Could not verify the reset link. Please request a new one.')
-      setReady(true)
-    }, 5000)
-
-    return () => { subscription.unsubscribe(); clearTimeout(t) }
   }, [])
 
   async function handleSubmit() {
@@ -69,7 +73,7 @@ export default function UpdatePasswordPage() {
     )
   }
 
-  if (error) {
+  if (error && !success) {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-6">
         <motion.div
