@@ -4,12 +4,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+
   const nextFromQuery = searchParams.get('next')
   const nextFromCookie = request.cookies.get('auth_next')?.value
-  const pendingReset = request.cookies.get('pending_reset')?.value === '1'
-  const next = pendingReset
-    ? '/update-password'
-    : (nextFromQuery ?? (nextFromCookie ? decodeURIComponent(nextFromCookie) : '/'))
+
+  // If no destination is specified it's a password reset — send to update-password
+  // Google OAuth always carries a 'next' param or auth_next cookie
+  const next = nextFromQuery
+    ?? (nextFromCookie ? decodeURIComponent(nextFromCookie) : null)
+    ?? '/update-password'
 
   if (code) {
     const response = NextResponse.redirect(`${origin}${next}`)
@@ -35,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return response  // response already has the auth cookies set
+      return response
     }
   }
 
