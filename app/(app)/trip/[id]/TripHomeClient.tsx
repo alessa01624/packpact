@@ -493,6 +493,9 @@ export default function TripHomeClient({
                       await supabase.from('proposals').delete().eq('id', p.id)
                       setProposals(prev => prev.filter(x => x.id !== p.id))
                     }}
+                    currentMemberId={currentMember.id}
+                    tripId={trip.id}
+                    allMembers={members}
                   />
                 ))}
               </div>
@@ -511,6 +514,9 @@ export default function TripHomeClient({
                       onVote={() => handleVote(p.id)}
                       isRevealed={isRevealed}
                       voteCount={voteCounts[p.id]}
+                      currentMemberId={currentMember.id}
+                      tripId={trip.id}
+                      allMembers={members}
                     />
                   ))}
                 </div>
@@ -543,7 +549,7 @@ export default function TripHomeClient({
                       {!joined ? (
                         <span className="text-gray-300 text-xs">Not joined</span>
                       ) : hasVoted ? (
-                        <span className="text-emerald-600 text-xs font-semibold">✓ Voted</span>
+                        <span className="text-emerald-600 text-xs font-semibold">✓ Voted once</span>
                       ) : (
                         <span className="text-gray-400 text-xs">Never voted</span>
                       )}
@@ -759,6 +765,12 @@ export default function TripHomeClient({
 
 // ── Proposal Card ──────────────────────────────────────────────────────────────
 
+interface ProposalComment {
+  id: string
+  member_id: string
+  content: string
+}
+
 interface CardProps {
   proposal: Proposal
   proposerLabel: string
@@ -768,77 +780,202 @@ interface CardProps {
   voteCount?: number
   isMine?: boolean
   onDelete?: () => Promise<void>
+  currentMemberId: string
+  tripId: string
+  allMembers: Pick<TripMember, 'id' | 'display_name' | 'emoji'>[]
 }
 
-function ProposalCard({ proposal, proposerLabel, hasVoted, onVote, isRevealed, voteCount, isMine, onDelete }: CardProps) {
+function ProposalCard({
+  proposal, proposerLabel, hasVoted, onVote, isRevealed, voteCount,
+  isMine, onDelete, currentMemberId, tripId, allMembers,
+}: CardProps) {
+  const supabase = createClient()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isFlipped, setIsFlipped] = useState(false)
+  const [comments, setComments] = useState<ProposalComment[]>([])
+  const [commentsLoaded, setCommentsLoaded] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [commentSaving, setCommentSaving] = useState(false)
+
+  async function loadComments() {
+    if (commentsLoaded) return
+    const { data } = await supabase
+      .from('proposal_comments')
+      .select('id, member_id, content')
+      .eq('proposal_id', proposal.id)
+    setComments(data ?? [])
+    setCommentsLoaded(true)
+  }
+
+  function handleFlip() {
+    if (!isFlipped) loadComments()
+    setIsFlipped(v => !v)
+  }
+
+  async function handleSendComment() {
+    const text = commentText.trim()
+    if (!text || commentSaving) return
+    setCommentSaving(true)
+    const { data } = await supabase
+      .from('proposal_comments')
+      .upsert(
+        { proposal_id: proposal.id, member_id: currentMemberId, trip_id: tripId, content: text },
+        { onConflict: 'proposal_id,member_id' }
+      )
+      .select('id, member_id, content')
+      .single()
+    if (data) {
+      setComments(prev => [...prev.filter(c => c.member_id !== currentMemberId), data])
+      setCommentText('')
+    }
+    setCommentSaving(false)
+  }
 
   let hostname = ''
   try { hostname = new URL(proposal.url.startsWith('http') ? proposal.url : 'https://' + proposal.url).hostname } catch {}
 
+  const myComment = comments.find(c => c.member_id === currentMemberId)
+
+  const frontVariants = {
+    enter: { opacity: 1, rotateY: 0, transition: { duration: 0.22 } },
+    exit:  { opacity: 0, rotateY: -15, transition: { duration: 0.18 } },
+  }
+  const backVariants = {
+    enter: { opacity: 1, rotateY: 0, transition: { duration: 0.22 } },
+    exit:  { opacity: 0, rotateY: 15, transition: { duration: 0.18 } },
+  }
+
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-      {/* Image area */}
-      <a href={proposal.url} target="_blank" rel="noopener noreferrer" className="block relative">
-        <div className="h-36 bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center overflow-hidden">
-          {proposal.og_image
-            ? <img src={proposal.og_image} alt={proposal.og_title ?? ''} className="w-full h-full object-cover" />
-            : <ExternalLink size={22} className="text-gray-300" />
-          }
-        </div>
-        {isMine && !isRevealed && onDelete && (
-          <button
-            onClick={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              if (confirmDelete) { onDelete() }
-              else setConfirmDelete(true)
-            }}
-            className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all ${
-              confirmDelete ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur-sm text-gray-500 hover:text-red-500'
-            }`}
+      <AnimatePresence mode="wait" initial={false}>
+        {!isFlipped ? (
+          <motion.div
+            key="front"
+            initial={{ opacity: 0, rotateY: 15 }}
+            animate={frontVariants.enter}
+            exit={frontVariants.exit}
           >
-            <Trash2 size={13} />
-          </button>
-        )}
-      </a>
+            <a href={proposal.url} target="_blank" rel="noopener noreferrer" className="block relative">
+              <div className="h-32 bg-gradient-to-br from-purple-50 to-pink-50 flex items-center justify-center overflow-hidden">
+                {proposal.og_image
+                  ? <img src={proposal.og_image} alt={proposal.og_title ?? ''} className="w-full h-full object-cover" />
+                  : <ExternalLink size={22} className="text-gray-300" />
+                }
+              </div>
+              {isMine && !isRevealed && onDelete && (
+                <button
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (confirmDelete) { onDelete() }
+                    else setConfirmDelete(true)
+                  }}
+                  className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all ${
+                    confirmDelete ? 'bg-red-500 text-white' : 'bg-white/80 backdrop-blur-sm text-gray-500 hover:text-red-500'
+                  }`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </a>
 
-      {/* Info */}
-      <div className="p-3 space-y-1">
-        <p className="text-gray-900 font-semibold text-sm leading-tight line-clamp-2">
-          {proposal.og_title ?? hostname}
-        </p>
-        <p className="text-gray-400 text-xs">by {proposerLabel}</p>
-        <div className="flex items-center gap-3 flex-wrap">
-          {proposal.og_price && (
-            <span className="flex items-center gap-1 text-purple-600 text-xs font-semibold">
-              $ {proposal.og_price}
-            </span>
-          )}
-          {proposal.dates && (
-            <span className="flex items-center gap-1 text-gray-400 text-xs">
-              📅 {proposal.dates}
-            </span>
-          )}
-        </div>
+            <div className="p-3 space-y-1.5">
+              <p className="text-gray-900 font-semibold text-sm leading-tight line-clamp-2">
+                {proposal.og_title ?? hostname}
+              </p>
+              <p className="text-gray-400 text-xs">by {proposerLabel}</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                {proposal.og_price && (
+                  <span className="text-purple-600 text-xs font-semibold">$ {proposal.og_price}</span>
+                )}
+                {proposal.dates && (
+                  <span className="text-gray-400 text-xs">📅 {proposal.dates}</span>
+                )}
+              </div>
 
-        {isRevealed ? (
-          <div className="mt-1 bg-gray-50 rounded-xl py-2 text-center text-xs font-semibold text-gray-500">
-            🏆 {voteCount ?? 0} {(voteCount ?? 0) === 1 ? 'vote' : 'votes'}
-          </div>
+              {isRevealed ? (
+                <div className="bg-gray-50 rounded-xl py-2 text-center text-xs font-semibold text-gray-500">
+                  🏆 {voteCount ?? 0} {(voteCount ?? 0) === 1 ? 'vote' : 'votes'}
+                </div>
+              ) : (
+                <button
+                  onClick={onVote}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
+                    hasVoted
+                      ? 'bg-purple-100 text-purple-600 ring-1 ring-purple-200'
+                      : 'bg-gray-100 text-gray-400 hover:bg-purple-50 hover:text-purple-500'
+                  }`}
+                >
+                  <ThumbsUp size={14} fill={hasVoted ? 'currentColor' : 'none'} />
+                </button>
+              )}
+              <button
+                onClick={handleFlip}
+                className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-50 text-gray-400 text-xs hover:bg-gray-100 transition-colors"
+              >
+                💬 Comments
+              </button>
+            </div>
+          </motion.div>
         ) : (
-          <button
-            onClick={onVote}
-            className={`mt-1 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
-              hasVoted
-                ? 'bg-purple-100 text-purple-600 ring-1 ring-purple-200'
-                : 'bg-gray-100 text-gray-400 hover:bg-purple-50 hover:text-purple-500'
-            }`}
+          <motion.div
+            key="back"
+            initial={{ opacity: 0, rotateY: -15 }}
+            animate={backVariants.enter}
+            exit={backVariants.exit}
+            className="flex flex-col"
+            style={{ minHeight: '280px' }}
           >
-            <ThumbsUp size={14} fill={hasVoted ? 'currentColor' : 'none'} />
-          </button>
+            <div className="px-3 pt-3 pb-2 flex items-center justify-between border-b border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">💬 Comments</p>
+              <button onClick={handleFlip} className="text-gray-400 hover:text-gray-600 p-0.5">
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2" style={{ minHeight: '80px' }}>
+              {!commentsLoaded ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 size={16} className="animate-spin text-gray-300" />
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-gray-300 text-xs text-center py-6">No comments yet</p>
+              ) : (
+                comments.map(c => {
+                  const m = allMembers.find(x => x.id === c.member_id)
+                  return (
+                    <div key={c.id} className="bg-gray-50 rounded-xl px-2.5 py-2">
+                      <p className="text-gray-400 text-xs mb-0.5">{m?.emoji} {m?.display_name ?? '?'}</p>
+                      <p className="text-gray-700 text-xs leading-relaxed">{c.content}</p>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            <div className="px-3 pb-3 pt-2 border-t border-gray-100 space-y-1.5">
+              <div className="relative">
+                <textarea
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value.slice(0, 100))}
+                  placeholder={myComment ? 'Update your comment…' : 'Add a comment…'}
+                  rows={2}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-2 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none pr-12"
+                />
+                <span className="absolute bottom-2.5 right-2.5 text-gray-300 text-xs">{commentText.length}/100</span>
+              </div>
+              <button
+                onClick={handleSendComment}
+                disabled={!commentText.trim() || commentSaving}
+                className="w-full bg-purple-500 disabled:opacity-40 text-white text-xs font-semibold py-2 rounded-xl flex items-center justify-center gap-1.5"
+              >
+                {commentSaving && <Loader2 size={12} className="animate-spin" />}
+                {myComment ? 'Update' : 'Send'}
+              </button>
+            </div>
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   )
 }

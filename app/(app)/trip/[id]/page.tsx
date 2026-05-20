@@ -102,6 +102,12 @@ export default async function TripPage({ params }: { params: Promise<{ id: strin
       .eq('trip_id', id)
     membersWhoVoted = Array.from(new Set((voterRows ?? []).map((r: { member_id: string }) => r.member_id)))
   } catch {}
+  // Always reflect current user's own status correctly regardless of admin client
+  if (myVotedProposalIds.length > 0) {
+    if (!membersWhoVoted.includes(member.id)) membersWhoVoted.push(member.id)
+  } else {
+    membersWhoVoted = membersWhoVoted.filter(id => id !== member.id)
+  }
 
   return (
     <TripHomeClient
