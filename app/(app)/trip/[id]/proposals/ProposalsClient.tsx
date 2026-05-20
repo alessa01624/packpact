@@ -15,11 +15,12 @@ interface Props {
   members: Pick<TripMember, 'id' | 'display_name' | 'emoji'>[]
   myVotedProposalIds: string[]
   voteCounts: Record<string, number>
+  membersWhoVoted: string[]
 }
 
 export default function ProposalsClient({
   trip, currentMember, proposals, myProposalsCount,
-  members, myVotedProposalIds, voteCounts,
+  members, myVotedProposalIds, voteCounts, membersWhoVoted,
 }: Props) {
   const router = useRouter()
   const supabase = createClient()
@@ -177,6 +178,31 @@ export default function ProposalsClient({
                 index={i}
               />
             ))}
+          </div>
+        )}
+
+        {/* Voting status */}
+        {!isRevealed && members.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <p className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">Chi ha votato</p>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl divide-y divide-zinc-800">
+              {members.map(m => {
+                const hasVoted = membersWhoVoted.includes(m.id)
+                const isMe = m.id === currentMember.id
+                return (
+                  <div key={m.id} className="flex items-center justify-between px-4 py-3">
+                    <span className="text-white text-sm">{m.emoji} {m.display_name}{isMe ? ' (tu)' : ''}</span>
+                    {hasVoted ? (
+                      <span className="text-emerald-400 text-xs font-semibold flex items-center gap-1">
+                        <span>✓</span> Voted
+                      </span>
+                    ) : (
+                      <span className="text-zinc-600 text-xs">Never voted</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

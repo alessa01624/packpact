@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import ProposalsClient from './ProposalsClient'
 
 export default async function ProposalsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -42,6 +43,17 @@ export default async function ProposalsPage({ params }: { params: Promise<{ id: 
     .select('id, display_name, emoji')
     .eq('trip_id', id)
 
+  // Get which members have voted at least once (bypass RLS with service role)
+  const admin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { data: voterRows } = await admin
+    .from('votes')
+    .select('member_id')
+    .eq('trip_id', id)
+  const membersWhoVoted = [...new Set((voterRows ?? []).map(r => r.member_id))]
+
   // If revealed, get votes
   let myVotedProposalIds: string[] = []
   let voteCounts: Record<string, number> = {}
@@ -75,6 +87,7 @@ export default async function ProposalsPage({ params }: { params: Promise<{ id: 
       members={members ?? []}
       myVotedProposalIds={myVotedProposalIds}
       voteCounts={voteCounts}
+      membersWhoVoted={membersWhoVoted}
     />
   )
 }
